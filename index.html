@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Casa em ordem</title>
+  <style>
+    :root{--ink:#15211d;--muted:#64726d;--line:#dce6e0;--bg:#f5f8f5;--card:#fff;--green:#19764b;--soft:#e6f5ec;--warn:#fff4d7;--danger:#b64242}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,Segoe UI,sans-serif}.shell{max-width:860px;margin:auto;padding:20px 16px 48px}header{padding:12px 4px 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}h1{font-size:1.65rem;line-height:1.1;margin:0 0 5px}h2{font-size:1.05rem;margin:0}.sub{color:var(--muted);margin:0}.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0;box-shadow:0 1px 2px #1231}.today{background:var(--soft);border-color:#b7dfc5}.row{display:flex;align-items:center;justify-content:space-between;gap:14px}.selectors{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:.83rem;font-weight:700;color:var(--muted)}select,input,button{font:inherit}select,input{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:white;margin-top:4px}button{border:0;border-radius:10px;padding:10px 13px;background:var(--green);color:white;font-weight:700;cursor:pointer}button.ghost{background:#eef2ef;color:var(--ink)}button:disabled{opacity:.55;cursor:not-allowed}.task{padding:14px 0;border-top:1px solid var(--line)}.task:first-of-type{border-top:0}.task-name{font-weight:750}.assignee{color:var(--muted);font-size:.92rem}.done{color:var(--green);font-size:.9rem;font-weight:650}.pending{color:#9b6815;font-size:.9rem;font-weight:650}.check{min-width:94px}.history-item{padding:10px 0;border-top:1px solid var(--line);font-size:.92rem}.history-item:first-child{border-top:0}.badge{font-size:.78rem;padding:5px 8px;border-radius:999px;background:#eef2ef;color:var(--muted);white-space:nowrap}.empty{color:var(--muted);padding:6px 0}.notice{font-size:.84rem;color:var(--muted);margin:7px 2px 0}@media(max-width:480px){.shell{padding:13px 12px 35px}header{padding-top:8px}.selectors{grid-template-columns:1fr}.row{align-items:flex-start}.check{min-width:80px;padding:9px}.card{padding:14px}}
+  </style>
+</head>
+<body><main class="shell">
+  <header><div><h1>Casa em ordem</h1><p class="sub">Escala de limpeza do apartamento</p></div><span class="badge" id="storage">Carregando…</span></header>
+  <section class="card today"><div class="selectors"><label>Quem está usando?<select id="resident"></select></label><label>Dia da escala<input id="date" type="date"></label></div><p class="notice" id="dayNote"></p></section>
+  <section class="card"><div class="row"><h2>Checklist</h2><span class="badge" id="progress">0/0</span></div><div id="tasks"></div></section>
+  <section class="card"><div class="row"><h2>Histórico recente</h2><button class="ghost" id="refresh">Atualizar</button></div><div id="history"></div></section>
+</main>
+<script>
+/* Para sincronizar entre celulares, preencha estes dois valores após criar o projeto Supabase. */
+const SUPABASE_URL = '';
+const SUPABASE_ANON_KEY = '';
+const people=['Mariana','Júlia','Miguel','Mateus'];
+const schedule={1:[['Sala + áreas comuns','Mariana'],['Cozinha','Miguel'],['Banheiro Mariana/Júlia','Júlia'],['Suíte Miguel/Mateus','Mateus'],['Lixo','Miguel']],2:[['Sala + áreas comuns','Júlia'],['Cozinha','Mateus'],['Banheiro Mariana/Júlia','Mariana'],['Suíte Miguel/Mateus','Miguel'],['Lixo','Mateus']],3:[['Sala + áreas comuns','Miguel'],['Cozinha','Mariana'],['Banheiro Mariana/Júlia','Júlia'],['Suíte Miguel/Mateus','Mateus'],['Lixo','Mariana']],4:[['Sala + áreas comuns','Mateus'],['Cozinha','Júlia'],['Banheiro Mariana/Júlia','Mariana'],['Suíte Miguel/Mateus','Miguel'],['Lixo','Júlia']],5:[['Sala + áreas comuns','Mariana'],['Cozinha','Miguel'],['Banheiro Mariana/Júlia','Júlia'],['Suíte Miguel/Mateus','Mateus'],['Lixo','Miguel']],6:[['Sala + áreas comuns','Júlia'],['Cozinha','Mateus'],['Banheiro Mariana/Júlia','Mariana'],['Suíte Miguel/Mateus','Miguel'],['Lixo','Mateus']]};
+const $=s=>document.querySelector(s), dateInput=$('#date'), resident=$('#resident');
+let records=[]; const remote=SUPABASE_URL&&SUPABASE_ANON_KEY;
+resident.innerHTML=people.map(x=>`<option>${x}</option>`).join(''); resident.value=localStorage.cleanResident||'Mariana';
+dateInput.value=new Date().toLocaleDateString('en-CA');
+$('#storage').textContent=remote?'Sincronizado':'Neste aparelho';
+const key=r=>`${r.date}|${r.task}`;
+function selected(){return dateInput.value} function dayNum(){return new Date(selected()+'T12:00:00').getDay()}
+async function load(){
+ if(remote){try{const u=`${SUPABASE_URL}/rest/v1/cleaning_checks?select=*&order=completed_at.desc&limit=200`;let r=await fetch(u,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${SUPABASE_ANON_KEY}`});if(!r.ok)throw Error();records=await r.json()}catch(e){alert('Não foi possível sincronizar agora. Verifique a configuração.');records=JSON.parse(localStorage.cleanRecords||'[]')}}
+ else records=JSON.parse(localStorage.cleanRecords||'[]'); render();
+}
+async function complete(task,assignee){
+ const rec={date:selected(),task,assignee,completed_by:resident.value,completed_at:new Date().toISOString()};
+ if(remote){let r=await fetch(`${SUPABASE_URL}/rest/v1/cleaning_checks`,{method:'POST',headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${SUPABASE_ANON_KEY}`,'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=representation'},body:JSON.stringify(rec)});if(!r.ok){alert('Não foi possível registrar. Tente novamente.');return} records=records.filter(x=>key(x)!==key(rec));records.unshift(rec)}
+ else {records=records.filter(x=>key(x)!==key(rec));records.unshift(rec);localStorage.cleanRecords=JSON.stringify(records)} render();
+}
+function fmt(iso){return new Intl.DateTimeFormat('pt-BR',{dateStyle:'short',timeStyle:'short'}).format(new Date(iso))}
+function render(){const d=dayNum(), tasks=schedule[d]; $('#dayNote').textContent=d===0?'Domingo: livre / manutenção. O lixo é responsabilidade de quem perceber que está cheio.':new Intl.DateTimeFormat('pt-BR',{weekday:'long',day:'numeric',month:'long'}).format(new Date(selected()+'T12:00:00'));
+ if(!tasks){$('#tasks').innerHTML='<p class="empty">Dia livre para manutenção e organização. Sem tarefas fixas.</p>';$('#progress').textContent='Livre'}else{let done=0;$('#tasks').innerHTML=tasks.map(([task,who])=>{let r=records.find(x=>x.date===selected()&&x.task===task);if(r)done++;return `<div class="task row"><div><div class="task-name">${task}</div><div class="assignee">Responsável: ${who}</div>${r?`<div class="done">✓ Feito por ${r.completed_by} · ${fmt(r.completed_at)}</div>`:'<div class="pending">Pendente</div>'}</div><button class="check ${r?'ghost':''}" ${r?'disabled':''} data-task="${task}" data-who="${who}">${r?'Concluído':'Marcar feito'}</button></div>`}).join('');$('#progress').textContent=`${done}/${tasks.length}`;document.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>complete(b.dataset.task,b.dataset.who))}
+ const recent=records.slice().sort((a,b)=>b.completed_at.localeCompare(a.completed_at)).slice(0,12);$('#history').innerHTML=recent.length?recent.map(r=>`<div class="history-item"><strong>${r.task}</strong><br><span class="assignee">${r.date.split('-').reverse().join('/')} · marcado por ${r.completed_by} · ${fmt(r.completed_at)}</span></div>`).join(''):'<p class="empty">Ainda não há tarefas concluídas.</p>';
+}
+resident.onchange=()=>localStorage.cleanResident=resident.value;dateInput.onchange=render;$('#refresh').onclick=load;load();
+</script></body></html>
+
