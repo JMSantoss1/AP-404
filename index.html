@@ -27,7 +27,7 @@ $('#storage').textContent=remote?'Sincronizado':'Neste aparelho';
 const key=r=>`${r.date}|${r.task}`;
 function selected(){return dateInput.value} function dayNum(){return new Date(selected()+'T12:00:00').getDay()}
 async function load(){
- if(remote){try{const u=`${SUPABASE_URL}/rest/v1/cleaning_checks?select=*&order=completed_at.desc&limit=200`;let r=await fetch(u,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${SUPABASE_ANON_KEY}`});if(!r.ok)throw Error();records=await r.json()}catch(e){alert('Não foi possível sincronizar agora. Verifique a configuração.');records=JSON.parse(localStorage.cleanRecords||'[]')}}
+ if(remote){try{const u=`${SUPABASE_URL}/rest/v1/cleaning_checks?select=*&order=completed_at.desc&limit=200`;let r=await fetch(u,{headers:{apikey:SUPABASE_ANON_KEY,Authorization:`Bearer ${SUPABASE_ANON_KEY}`}});if(!r.ok)throw Error();records=await r.json()}catch(e){alert('Não foi possível sincronizar agora. Verifique a configuração.');records=JSON.parse(localStorage.cleanRecords||'[]')}}
  else records=JSON.parse(localStorage.cleanRecords||'[]'); render();
 }
 async function complete(task,assignee){
